@@ -21,7 +21,9 @@ kotlin {
 
 // Configure project's dependencies
 repositories {
+    gradlePluginPortal()
     mavenCentral()
+    maven("https://www.jetbrains.com/intellij-repository/releases")
 
     // IntelliJ Platform Gradle Plugin Repositories Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-repositories-extension.html
     intellijPlatform {
@@ -33,6 +35,8 @@ repositories {
 dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.opentest4j)
+    testImplementation(libs.kotestRunnerJunit5)
+    testImplementation(libs.kotestAssertionsCore)
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
@@ -46,6 +50,10 @@ dependencies {
 
         testFramework(TestFrameworkType.Platform)
     }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
 }
 
 // Configure IntelliJ Platform Gradle Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
@@ -131,6 +139,10 @@ tasks {
 
     publishPlugin {
         dependsOn(patchChangelog)
+    }
+
+    runIde {
+        jvmArgs = listOf("-Xmx2048m", "-Didea.is.internal=true")
     }
 }
 

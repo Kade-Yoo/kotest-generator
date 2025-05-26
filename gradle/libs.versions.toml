@@ -9,14 +9,18 @@ intelliJPlatform = "2.5.0"
 kotlin = "2.1.20"
 kover = "0.9.1"
 qodana = "2024.3.4"
+kotest = "5.9.1"
 
 [libraries]
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotestRunnerJunit5 = { group = "io.kotest", name = "kotest-runner-junit5", version.ref = "kotest" }
+kotestAssertionsCore = { group = "io.kotest", name = "kotest-assertions-core", version.ref = "kotest" }
 opentest4j = { group = "org.opentest4j", name = "opentest4j", version.ref = "opentest4j" }
 
 [plugins]
 changelog = { id = "org.jetbrains.changelog", version.ref = "changelog" }
 intelliJPlatform = { id = "org.jetbrains.intellij.platform", version.ref = "intelliJPlatform" }
+intelliJ = { id = "org.jetbrains.intellij", version = "1.17.3" }
 kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 qodana = { id = "org.jetbrains.qodana", version.ref = "qodana" }

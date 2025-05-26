@@ -5,11 +5,15 @@
     <vendor>kade-yoo</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.kotlin</depends>
 
-    <resource-bundle>messages.MyBundle</resource-bundle>
-
-    <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.kadeyoo.kotestgenerator.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.kadeyoo.kotestgenerator.startup.MyProjectActivity" />
-    </extensions>
+    <actions>
+        <action
+                id="GenerateKotestSpec"
+                class="com.github.kadeyoo.kotestgenerator.action.GenerateSpecAction"
+                text="Generate Kotest Spec"
+                description="Generate a Kotest BehaviorSpec file based on the current class">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+        </action>
+    </actions>
 </idea-plugin>
