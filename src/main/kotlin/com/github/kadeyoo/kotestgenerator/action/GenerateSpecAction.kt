@@ -7,7 +7,6 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.psi.JavaDirectoryService
 import com.intellij.psi.PsiElement
@@ -43,8 +42,7 @@ class GenerateSpecAction : AnAction() {
         } ?: fileDirectory
 
         WriteCommandAction.runWriteCommandAction(project) {
-            val existingFile = finalTestDir.findFile(file.name)
-            if (existingFile != null) return@runWriteCommandAction
+            finalTestDir.findFile(file.name)?.delete()
 
             val newFile = PsiFileFactory.getInstance(project).createFileFromText(file.name, file.fileType, content)
             finalTestDir.add(newFile)
