@@ -16,4 +16,12 @@
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
         </action>
     </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectConfigurable
+                instance="com.github.kadeyoo.kotestgenerator.common.KotestGeneratorSettingsConfigurable"
+                id="com.github.kadeyoo.kotestgenerator.common"
+                displayName="Kotest Generator"
+        />
+    </extensions>
 </idea-plugin>

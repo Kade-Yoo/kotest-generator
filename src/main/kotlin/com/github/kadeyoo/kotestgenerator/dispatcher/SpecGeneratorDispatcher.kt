@@ -7,12 +7,12 @@ import com.intellij.psi.PsiElement
 class SpecGeneratorDispatcher(
     private val generators: List<CodeSpecGenerator>
 ) {
-    fun generateSpec(psiElement: PsiElement): String {
+    fun generateSpec(psiElement: PsiElement, isPresent: Boolean): String {
         val element = findElement(psiElement) ?: error("No valid element found for generation: ${psiElement::class.simpleName}")
         val annotationNames = getAnnotations(element)
         val componentType = determineComponentType(annotationNames)
         val generator = generators.firstOrNull { it.supports(element) } ?: error("No suitable generator found for element: ${element::class.simpleName}")
-        return generator.generateSpec(element, componentType)
+        return generator.generateSpec(element, componentType, isPresent)
     }
 
     private fun getAnnotations(element: PsiElement) = try {

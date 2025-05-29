@@ -5,5 +5,5 @@ import com.intellij.psi.PsiElement
 
 interface CodeSpecGenerator {
     fun supports(psiElement: PsiElement): Boolean
-    fun generateSpec(psiElement: PsiElement, componentType: ComponentType): String
+    fun generateSpec(psiElement: PsiElement, componentType: ComponentType, isPresent: Boolean): String
 }
