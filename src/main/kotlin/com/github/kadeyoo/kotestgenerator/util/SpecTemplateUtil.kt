@@ -1,90 +1,162 @@
 package com.github.kadeyoo.kotestgenerator.util
 
-import com.github.kadeyoo.kotestgenerator.dto.FunctionInfo
-import com.github.kadeyoo.kotestgenerator.common.ComponentType
 import com.github.kadeyoo.kotestgenerator.common.KotestGeneratorSettings
+import com.github.kadeyoo.kotestgenerator.common.code.ComponentType
+import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_CLASS_PACKAGE
+import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_NAMED_FUNCTION_PACKAGE
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.GET_METHOD_NAME
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.GIVEN
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_BEHAVIOR_SPEC
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_MOCKK_EVERY
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.TEST_COMMENT
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.THEN
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.VALID_RESPONSE_STATUS_IS_BAD_REQUEST
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.VALID_RESPONSE_STATUS_IS_OK
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.WHEN
+import com.github.kadeyoo.kotestgenerator.dto.ClassInfo
+import com.github.kadeyoo.kotestgenerator.dto.FunctionInfo
+import com.intellij.psi.PsiElement
 
 object SpecTemplateUtil {
-    fun generateSpec(
-        packageName: String?, className: String, functionInfos: List<FunctionInfo>,
-        componentType: ComponentType, isPresent: Boolean
+    private val state = KotestGeneratorSettings.getInstance().state
+
+    fun generateSpec(classInfo: ClassInfo,
+                     functionInfos: List<FunctionInfo>,
+                     componentType: ComponentType,
+                     isPresent: Boolean
     ): String = when (componentType) {
-        ComponentType.API -> buildApiSpec(packageName, className, functionInfos, isPresent)
-        ComponentType.SERVICE -> buildServiceSpec(packageName, className, functionInfos, isPresent)
-        ComponentType.REPOSITORY -> buildRepositorySpec(packageName, className)
-        else -> buildDefaultSpec(packageName, className, functionInfos)
+        ComponentType.API -> buildApiSpec(classInfo, functionInfos, isPresent)
+        ComponentType.SERVICE -> buildServiceSpec(classInfo, functionInfos, isPresent)
+        ComponentType.REPOSITORY -> buildRepositorySpec(classInfo)
+        else -> buildDefaultSpec(classInfo, functionInfos)
     }
 
-    private fun buildApiSpec(packageName: String?, className: String, functionInfos: List<FunctionInfo>, isPresent: Boolean): String = buildString {
+    fun findAnnotations(element: PsiElement): List<String> = try {
+        when (element.javaClass.name) {
+            KT_CLASS_PACKAGE -> {
+                findAnnotation(element)
+            }
+
+            KT_NAMED_FUNCTION_PACKAGE -> {
+                var parent = element.parent
+                while (parent != null && parent.javaClass.name != KT_CLASS_PACKAGE) {
+                    parent = parent.parent
+                }
+
+                if (parent != null) {
+                    findAnnotation(parent)
+                } else {
+                    emptyList()
+                }
+            }
+
+            else -> emptyList()
+        }
+    } catch (e: Exception) {
+        emptyList()
+    }
+
+    private fun buildApiSpec(classInfo: ClassInfo, functionInfos: List<FunctionInfo>, isPresent: Boolean): String = buildString {
         if (isPresent) {
             functionInfos.forEach { appendLine(buildApiTestBody(it)) }
             return@buildString
         }
-        if (!packageName.isNullOrBlank()) appendLine("package $packageName")
+        if (classInfo.packageName.isNotBlank()) appendLine("package ${classInfo.packageName}")
         appendLine()
+        appendLine("import ${classInfo.packageName}.${classInfo.name}")
         appendLine(CodeGeneratorUtil.apiImportStatements())
-        appendLine(CodeGeneratorUtil.commentStatements())
-        appendLine("@WebMvcTest($className::class)")
+        classInfo.importNames.forEach { appendLine("import $it") }
+        appendLine(state.getMockLibImport())
+        appendLine(TEST_COMMENT)
+        appendLine("@WebMvcTest(${classInfo.name}::class)")
         appendLine("@AutoConfigureMockMvc")
-        appendLine("class ${className}ApiTest(")
-        appendLine("    @Autowired val mockMvc: MockMvc")
-        appendLine(") : BehaviorSpec({")
+        appendLine("class ${classInfo.name}Test : BehaviorSpec({")
+        appendLine()
+        appendLine("    val mapper= jacksonObjectMapper()")
+        classInfo.parameters.forEach { pair ->
+            appendLine("    val ${pair.first}: ${pair.second} = mockk()")
+        }
+        appendLine("    lateinit var mockMvc: MockMvc")
+        appendLine()
+        appendLine("    beforeTest {")
+        appendLine("    mockMvc = MockMvcBuilders")
+        appendLine("        .standaloneSetup(${classInfo.name}(${classInfo.parameters.joinToString(",") { it.first }})).build()")
+        appendLine("    }")
+        appendLine()
         functionInfos.forEach { appendLine(buildApiTestBody(it)) }
         appendLine("})")
     }
 
-    fun buildApiTestBody(fn: FunctionInfo): String {
-        val (name, parameters, _, mappingInfo) = fn
+    private fun buildApiTestBody(fn: FunctionInfo): String {
+        val (name, parameters, returnType, mappingInfo) = fn
         val url = mappingInfo?.url ?: "/TODO"
-        val httpMethod = mappingInfo?.method ?: "get"
+        val httpMethod = mappingInfo?.method ?: GET_METHOD_NAME
         val urlParams = CodeGeneratorUtil.buildUrlParams(parameters)
         val paramDecl = CodeGeneratorUtil.buildParamDecl(parameters)
         val fullUrl = if (urlParams.isNotBlank()) "\"$url?$urlParams\"" else "\"$url\""
-        val notFoundParamDecl = CodeGeneratorUtil.buildBadParamDecl(parameters)
-        val notFoundUrlParams = CodeGeneratorUtil.buildBadUrlParams(parameters)
-        val notFoundUrl = if (notFoundUrlParams.isNotBlank()) "\"$url?$notFoundUrlParams\"" else "\"$url\""
+        val badRequestParamDecl = CodeGeneratorUtil.buildBadParamDecl(parameters)
+
         return buildString {
-            appendLine("    given(\"$name API 호출 시\") {")
+            appendLine("    $GIVEN(\"$name API 호출 시\") {")
             if (paramDecl.isNotBlank()) appendLine("        $paramDecl")
-            appendLine("        `when`(\"정상적인 요청을 보낼 경우\") {")
-            appendLine("            then(\"200 OK와 정상 결과를 반환한다\") {")
-            appendLine("                val result = mockMvc.perform(${httpMethod}($fullUrl)) // TODO: post/put 등도 지원")
-            appendLine("                    .andExpect(status().isOk)")
-            appendLine("                    .andReturn()")
-            appendLine("                println(result.response.contentAsString) // TODO: 실제 응답 값 검증 코드 추가")
+            appendLine("        // TODO: mock 반환값/로직 실제에 맞게 수정해주세요.")
+            appendLine("        val expected: $returnType = ApiResponse(data = emptyList()) ")
+            appendLine()
+            appendLine("        // TODO: service mock 반환값/로직 실제에 맞게 수정해주세요.")
+            appendLine("        every {  }")
+            appendLine("        $WHEN(\"정상적인 요청을 보낼 경우\") {")
+            appendLine("            val result = mockMvc.${httpMethod}($fullUrl) // TODO: post/put/delete 등도 지원")
+            appendLine("                .andExpect { status { isOk() } }")
+            appendLine("                .andReturn()")
+            appendLine()
+            appendLine("            // TODO: 실제 응답 코드에 맞게 수정해주세요.")
+            appendLine("            $THEN(\"200 OK를 반환한다\") {")
+            appendLine("                $VALID_RESPONSE_STATUS_IS_OK")
+            appendLine("            }")
+            appendLine()
+            appendLine("            // TODO: 실제 응답 값에 맞게 수정해주세요.")
+            appendLine("            $THEN(\"정상 결과를 반환한다\") {")
+            appendLine("                val responseData = mapper.readValue<${returnType}>(result.response.contentAsByteArray)")
+            appendLine("                responseData.data shouldBe expected.data // TODO: 실제 값에 맞게 검증")
             appendLine("            }")
             appendLine("        }")
             appendLine()
             appendLine("        // 예외 케이스: 존재하지 않는 값으로 요청")
-            appendLine("        `when`(\"존재하지 않는 값으로 요청하면\") {")
-            if (notFoundParamDecl.isNotBlank()) appendLine("            $notFoundParamDecl")
-            appendLine("            then(\"404 Not Found가 반환된다\") {")
-            appendLine("                mockMvc.perform(${httpMethod}($notFoundUrl))")
-            appendLine("                    .andExpect(status().isNotFound) // TODO: 실제 예외/응답 코드에 맞게 수정")
+            appendLine("        $WHEN(\"존재하지 않는 값으로 요청하면\") {")
+            if (badRequestParamDecl.isNotBlank()) appendLine("            $badRequestParamDecl")
+            appendLine("            val result = mockMvc.${httpMethod}($fullUrl) // TODO: post/put/delete 등도 지원")
+            appendLine("                .andExpect { status { isBadRequest() } }")
+            appendLine("                .andReturn()")
+            appendLine()
+            appendLine("            $THEN(\"400 Bad Request 가 반환된다\") {")
+            appendLine("                $VALID_RESPONSE_STATUS_IS_BAD_REQUEST")
             appendLine("            }")
             appendLine("        }")
             appendLine("    }")
         }
     }
 
-    private fun buildServiceSpec(packageName: String?, className: String, functionInfos: List<FunctionInfo>, isPresent: Boolean): String = buildString {
-        val state = KotestGeneratorSettings.getInstance().state
+    private fun buildServiceSpec(classInfo: ClassInfo, functionInfos: List<FunctionInfo>, isPresent: Boolean): String = buildString {
         if (isPresent) {
             functionInfos.forEach { appendLine(buildServiceTestBody(it)) }
             return@buildString
         }
-        appendLine(CodeGeneratorUtil.commentStatements())
-        if (!packageName.isNullOrBlank()) appendLine("package $packageName")
+        appendLine(TEST_COMMENT)
+        if (classInfo.packageName.isNotBlank()) appendLine("package $classInfo.packageName")
         appendLine()
-        appendLine("import io.kotest.core.spec.style.BehaviorSpec")
+        appendLine(IMPORT_BEHAVIOR_SPEC)
+        appendLine(IMPORT_MOCKK_EVERY)
         appendLine(state.getMockLibImport())
         appendLine()
-        appendLine("class ${className}Test : BehaviorSpec({")
+        appendLine("class ${classInfo.name}Test : BehaviorSpec({")
+        classInfo.parameters.forEach { pair ->
+            appendLine("    val ${pair.first}: ${pair.second} = mockk()")
+        }
         functionInfos.forEach { appendLine(buildServiceTestBody(it)) }
         appendLine("})")
     }
 
-    fun buildServiceTestBody(fn: FunctionInfo): String {
+    private fun buildServiceTestBody(fn: FunctionInfo): String {
         val (name, parameters, returnType) = fn
         val paramDecl = parameters.joinToString(", ") { (n, t) -> "val $n = ${CodeGeneratorUtil.dummyValue(t)}" }
         val paramList = parameters.joinToString(", ") { it.first }
@@ -96,61 +168,101 @@ object SpecTemplateUtil {
                 else -> CodeGeneratorUtil.dummyValue(t)
             }
         }
+
         return buildString {
-            appendLine("// 정상 시나리오: 정상 파라미터 전달")
-            appendLine("given(\"$name 호출 시\"){")
-            if (paramDecl.isNotBlank()) appendLine("        $paramDecl")
-            if (expected.isNotBlank()) appendLine("        $expected")
-            if (expected.isNotBlank()) appendLine("        every { repository.$name($paramList) } returns expected // TODO: mock 반환값/로직 실제에 맞게 수정")
+            appendLine("$GIVEN(\"$name 에 유효한 정보를 입력하고\") {")
+            // 기존 단일 정상/예외 케이스
+            if (paramDecl.isNotBlank()) appendLine("    $paramDecl")
+            if (expected.isNotBlank()) appendLine("    $expected")
+            if (expected.isNotBlank()) appendLine("     // TODO: mock 반환값/로직 실제에 맞게 수정해주세요.")
+            if (expected.isNotBlank()) appendLine("     every { }")
             appendLine()
-            appendLine("        `when`(\"정상적인 파라미터가 주어지면\") {")
+            appendLine("        $WHEN(\"조회하면\") {")
             val result = if (returnType == "Unit") "service.$name($paramList)" else "    val result = service.$name($paramList)"
-            appendLine("            then(\"정상 결과가 반환되어야 한다\") {")
+            appendLine("            $$THEN(\"정상 결과가 반환되어야 한다\") {")
             appendLine("                $result")
             if (expected.isNotBlank()) appendLine("                result shouldBe expected // TODO: 실제 값에 맞게 검증")
             appendLine("            }")
             appendLine("        }")
             appendLine()
-            appendLine("        `when`(\"존재하지 않는 ID 등 예외 상황이 주어지면\") {")
-            appendLine("            then(\"예외가 발생해야 한다\") {")
-            appendLine("                every { repository.$name($notFoundParamList) } returns null // 또는 throws Exception // TODO: 실제 로직에 맞게 mock 세팅")
-            appendLine("                shouldThrow<Exception /* TODO: 실제 예외 타입 */> {")
+            appendLine("        every { repository.$name($notFoundParamList) } returns null")
+            appendLine("        $WHEN(\"존재하지 않는 ID로 인해 에러가 발생한다면\") {")
+            appendLine("            $$THEN(\"예외가 발생해야 한다\") {")
+            appendLine("                // TODO: 예외 타입에 맞게 수정")
+            appendLine("                shouldThrow<Exception> {")
             appendLine("                    service.$name($notFoundParamList)")
             appendLine("                }")
             appendLine("            }")
             appendLine("        }")
             appendLine("    }")
+            for ((paramName, type) in parameters) {
+                append(buildParameterScenarioBlock(paramName, type))
+            }
         }
     }
 
-    private fun buildRepositorySpec(packageName: String?, className: String): String = buildString {
-        val state = KotestGeneratorSettings.getInstance().state
-        if (!packageName.isNullOrBlank()) appendLine("package $packageName")
+    private fun buildRepositorySpec(classInfo: ClassInfo): String = buildString {
+        if (classInfo.packageName.isNotBlank()) appendLine("package ${classInfo.packageName}")
         appendLine()
-        appendLine("import io.kotest.core.spec.style.BehaviorSpec")
+        appendLine(IMPORT_BEHAVIOR_SPEC)
+        appendLine(IMPORT_MOCKK_EVERY)
         appendLine(state.getMockLibImport())
         appendLine()
-        appendLine("class ${className}Test : BehaviorSpec({")
-        appendLine("""${state.getIndentString()}given("Repository $className 호출 시") {""")
-        appendLine("""${state.getIndentString()}    When("데이터 접근이 수행되면") {""")
-        appendLine("""            Then("DB와 정상적으로 상호작용해야 한다") { }""")
+        appendLine("class ${classInfo.name}Test : BehaviorSpec({")
+        appendLine("""${state.getIndentString()}$GIVEN("Repository ${classInfo.name} 호출 시") {""")
+        appendLine("""${state.getIndentString()}    $WHEN("데이터 접근이 수행되면") {""")
+        appendLine("""${state.getIndentString()}        $$THEN("DB와 정상적으로 상호작용해야 한다") { }""")
         appendLine("        }")
-        appendLine("${state.getIndentString()}}")
+        appendLine("    ")
         appendLine("})")
     }
 
-    private fun buildDefaultSpec(packageName: String?, className: String, functionInfos: List<FunctionInfo>): String = buildString {
-        if (!packageName.isNullOrBlank()) appendLine("package $packageName")
+    private fun buildDefaultSpec(classInfo: ClassInfo, functionInfos: List<FunctionInfo>): String = buildString {
+        if (classInfo.packageName.isNotBlank()) appendLine("package ${classInfo.packageName}")
         appendLine()
-        appendLine("import io.kotest.core.spec.style.BehaviorSpec")
-        appendLine("import io.mockk.every")
+        appendLine(IMPORT_BEHAVIOR_SPEC)
+        appendLine(IMPORT_MOCKK_EVERY)
         appendLine()
-        appendLine("class ${className}Test : BehaviorSpec({")
+        appendLine("class ${classInfo.name}Test : BehaviorSpec({")
         for (fn in functionInfos) {
-            appendLine("""    given("${fn.name}") {""")
-            appendLine("""        then("should do something") { }""")
+            appendLine("""    $GIVEN("${fn.name}") {""")
+            appendLine("""        $$THEN("should do something") { }""")
             appendLine("    }")
         }
         appendLine("})")
+    }
+
+    private fun scenarioCasesForType(type: String): List<Pair<String, String>> = when (type) {
+        "Long", "Int" -> listOf(
+            "정상값" to "1",
+            "음수" to "-1",
+            "최대값" to "Long.MAX_VALUE",
+            "null" to "null"
+        )
+        "String" -> listOf(
+            "정상값" to "\"abc\"",
+            "빈값" to "\"\"",
+            "null" to "null"
+        )
+        else -> listOf("기본값" to "$type()")
+    }
+
+    private fun buildParameterScenarioBlock(paramName: String, type: String): String = buildString {
+        val cases = scenarioCasesForType(type)
+        for ((desc, value) in cases) {
+            appendLine("    $WHEN(\"$paramName: $desc\") {")
+            appendLine("        $$THEN(\"적절한 응답이 반환된다\") {")
+            appendLine("            val $paramName = $value")
+            appendLine("            // TODO: 실제 메소드 호출 및 검증")
+            appendLine("        }")
+            appendLine("    }")
+        }
+    }
+
+    private fun findAnnotation(element: PsiElement): List<String> {
+        val method = element::class.java.methods.find { it.name == "getAnnotationEntries" }
+        return (method?.invoke(element) as? List<*>)
+            ?.mapNotNull { it?.javaClass?.getMethod("getShortName")?.invoke(it)?.toString() }
+            ?: emptyList()
     }
 }

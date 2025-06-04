@@ -13,10 +13,12 @@ import com.intellij.openapi.components.Storage
 )
 class KotestGeneratorSettings : PersistentStateComponent<KotestGeneratorSettings.State> {
     data class State(
-        var mockLib: String = "mockk",
-        var indent: Int = 4,
-        var insertComment: Boolean = true
-    ) {
+        var mockLib: String = "mockk", // Mock 라이브러리의 기본값
+        var indent: Int = 4, // 들여쓰기 기본값
+        var insertComment: Boolean = true, // 주석 기본값
+        var testStyle: String = "Describe" // Kotest 스타일 기본값
+    )
+    {
         fun getIndentString(): String {
             return " ".repeat(this.indent)
         }
@@ -30,15 +32,16 @@ class KotestGeneratorSettings : PersistentStateComponent<KotestGeneratorSettings
         }
     }
 
-    private var state = State() // 내부에 실제 값 보관
+    // 내부에 실제 값 보관
+    private var state = State()
 
+    // 플러그인이 설정값 저장할 때 호출됨 (내부 state를 리턴)
     override fun getState(): State {
-        // 플러그인이 설정값 저장할 때 호출됨 (내부 state를 리턴)
         return state
     }
 
+    // 플러그인이 설정값 로딩할 때 호출됨 (내부 state에 복사)
     override fun loadState(state: State) {
-        // 플러그인이 설정값 로딩할 때 호출됨 (내부 state에 복사)
         this.state = state
     }
 

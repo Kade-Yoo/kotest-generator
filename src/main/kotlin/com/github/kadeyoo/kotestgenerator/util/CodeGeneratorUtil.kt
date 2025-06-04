@@ -1,7 +1,35 @@
 package com.github.kadeyoo.kotestgenerator.util
 
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.DELETE_MAPPING_ANNOTATION
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.DELETE_METHOD_NAME
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.GET_MAPPING_ANNOTATION
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.GET_METHOD_NAME
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_AUTOWIRED
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_AUTO_CONFIGURE_MOCK_MVC
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_BEHAVIOR_SPEC
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_DELETE
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_GET
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_HTTP_STATUS
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_JACKSON_OBJECT_MAPPTER
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_MOCKK_EVERY
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_MOCK_MVC
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_MVC_BUILDER
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_POST
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_PUT
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_READ_VALUE
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_REQUEST_BUILDERS_GET
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_RESULT_MATCHERS_STATUS
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_SHOULD_BE
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_SHOULD_BE_EQUAL
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_WEB_MVC_TEST
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.POST_MAPPING_ANNOTATION
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.POST_METHOD_NAME
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.PUT_MAPPING_ANNOTATION
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.PUT_METHOD_NAME
+import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.REQUEST_MAPPING_ANNOTATION
 import com.github.kadeyoo.kotestgenerator.dto.MappingInfo
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 
 object CodeGeneratorUtil {
     fun dummyValue(type: String): String =
@@ -18,21 +46,20 @@ object CodeGeneratorUtil {
         val annotations = method.firstChild.children.filter { it.javaClass.name.contains("Annotation") }
         for (annotation in annotations) {
             val annotationText = annotation.text
-            val isGet = annotationText.contains("@GetMapping")
-            val isPost = annotationText.contains("@PostMapping")
-            val isPut = annotationText.contains("@PutMapping")
-            val isDelete = annotationText.contains("@DeleteMapping")
-            val isRequest = annotationText.contains("@RequestMapping")
+            val isGet = annotationText.contains(GET_MAPPING_ANNOTATION)
+            val isPost = annotationText.contains(POST_MAPPING_ANNOTATION)
+            val isPut = annotationText.contains(PUT_MAPPING_ANNOTATION)
+            val isDelete = annotationText.contains(DELETE_MAPPING_ANNOTATION)
+            val isRequest = annotationText.contains(REQUEST_MAPPING_ANNOTATION)
             if (isGet || isPost || isRequest || isPut || isDelete) {
-                // URL 추출 (단순한 value="..." 형태로 가정)
                 val split = annotationText.split("\"")
                 val url = split[1]
                 val methodType = when {
-                    isGet -> "get"
-                    isPost -> "post"
-                    isPut -> "put"
-                    isDelete -> "delete"
-                    else -> "get" // default
+                    isGet -> GET_METHOD_NAME
+                    isPost -> POST_METHOD_NAME
+                    isPut -> PUT_METHOD_NAME
+                    isDelete -> DELETE_METHOD_NAME
+                    else -> GET_METHOD_NAME
                 }
                 return MappingInfo(url, methodType)
             }
@@ -40,19 +67,15 @@ object CodeGeneratorUtil {
         return null
     }
 
-    // 파라미터 join + 람다 (모든 케이스 커버)
     fun <T> List<T>.toJoinedString(delimiter: String, transform: (T) -> String): String =
         this.joinToString(delimiter, transform = transform)
 
-    // 파라미터 선언
     fun buildParamDecl(parameters: List<Pair<String, String>>): String =
         parameters.toJoinedString("\n") { (n, t) -> "val $n = ${dummyValue(t)}" }
 
-    // 쿼리스트링 URL
     fun buildUrlParams(parameters: List<Pair<String, String>>): String =
         parameters.toJoinedString("&") { (n, _) -> "$n=\${$n}" }
 
-    // 예외용 bad 파라미터
     fun buildBadParamDecl(parameters: List<Pair<String, String>>): String =
         parameters.toJoinedString("\n") { (n, t) ->
             val badVal = when (t) {
@@ -62,29 +85,44 @@ object CodeGeneratorUtil {
             }
             "val $n = $badVal"
         }
-    fun buildBadUrlParams(parameters: List<Pair<String, String>>): String =
-        parameters.toJoinedString("&") { (n, _) -> "$n=\${$n}" }
 
-    // expected 리턴값
     fun expectedValue(returnType: String): String =
         if (returnType == "Unit") "" else "val expected = ${dummyValue(returnType)} // TODO: 실제 값으로 변경"
 
-    // API import statements
     fun apiImportStatements() = """
-        import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-        import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
-        import org.springframework.beans.factory.annotation.Autowired
-        import org.springframework.test.web.servlet.MockMvc
-        import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-        import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-        import io.kotest.core.spec.style.BehaviorSpec
+        $IMPORT_WEB_MVC_TEST
+        $IMPORT_AUTO_CONFIGURE_MOCK_MVC
+        $IMPORT_AUTOWIRED
+        $IMPORT_MOCK_MVC
+        $IMPORT_REQUEST_BUILDERS_GET
+        $IMPORT_RESULT_MATCHERS_STATUS
+        $IMPORT_BEHAVIOR_SPEC
+        $IMPORT_HTTP_STATUS
+        $IMPORT_JACKSON_OBJECT_MAPPTER
+        $IMPORT_READ_VALUE
+        $IMPORT_SHOULD_BE
+        $IMPORT_SHOULD_BE_EQUAL
+        $IMPORT_MVC_BUILDER
+        $IMPORT_GET
+        $IMPORT_POST
+        $IMPORT_PUT
+        $IMPORT_DELETE
+        $IMPORT_MOCKK_EVERY
     """.trimIndent()
 
-    fun commentStatements() = """
-        /**
-         * 이 테스트 코드는 Kotest 플러그인에 의해 자동 생성되었습니다.
-         * ⚠️ 실제 서비스 상황에 맞게 파라미터, mock, 예외 타입, 응답 검증 코드를 수정하세요!
-         * 옵션: 플러그인 설정(톱니바퀴 버튼)에서 코드 스타일, 네이밍, mock 종류 등을 선택할 수 있습니다.
-         */
-    """.trimIndent()
+    fun extractImportNamesFromFile(psiFile: PsiFile): List<String> {
+        val importListObj = extractImportsFromFile(psiFile) ?: return emptyList()
+        val getImportsMethod = importListObj.javaClass.methods.firstOrNull { it.name == "getImports" }
+        val importDirectives = getImportsMethod?.invoke(importListObj) as? List<*>
+        return importDirectives?.mapNotNull { importDirective ->
+            val getFqNameMethod = importDirective?.javaClass?.methods?.firstOrNull { it.name == "getImportedFqName" }
+            val fqNameObj = getFqNameMethod?.invoke(importDirective)
+            fqNameObj?.toString()
+        } ?: emptyList()
+    }
+
+    private fun extractImportsFromFile(psiFile: PsiFile): Any? {
+        val getImportListMethod = psiFile.javaClass.methods.firstOrNull { it.name == "getImportList" }
+        return getImportListMethod?.invoke(psiFile)
+    }
 }

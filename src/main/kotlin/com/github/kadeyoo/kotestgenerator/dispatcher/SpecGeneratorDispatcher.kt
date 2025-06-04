@@ -1,60 +1,27 @@
 package com.github.kadeyoo.kotestgenerator.dispatcher
 
-import com.github.kadeyoo.kotestgenerator.common.ComponentType
+import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_CLASS_PACKAGE
+import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_NAMED_FUNCTION_PACKAGE
 import com.github.kadeyoo.kotestgenerator.generator.CodeSpecGenerator
 import com.intellij.psi.PsiElement
 
 class SpecGeneratorDispatcher(
     private val generators: List<CodeSpecGenerator>
 ) {
-    fun generateSpec(psiElement: PsiElement, isPresent: Boolean): String {
-        val element = findElement(psiElement) ?: error("No valid element found for generation: ${psiElement::class.simpleName}")
-        val annotationNames = getAnnotations(element)
-        val componentType = determineComponentType(annotationNames)
-        val generator = generators.firstOrNull { it.supports(element) } ?: error("No suitable generator found for element: ${element::class.simpleName}")
-        return generator.generateSpec(element, componentType, isPresent)
-    }
-
-    private fun getAnnotations(element: PsiElement) = try {
-        when (element.javaClass.name) {
-            "org.jetbrains.kotlin.psi.KtClass" -> {
-                findAnnotation(element)
-            }
-
-            "org.jetbrains.kotlin.psi.KtNamedFunction" -> {
-                var parent = element.parent
-                while (parent != null && parent.javaClass.name != "org.jetbrains.kotlin.psi.KtClass") {
-                    parent = parent.parent
-                }
-
-                if (parent != null) {
-                    findAnnotation(parent)
-                } else {
-                    emptyList()
-                }
-            }
-
-            else -> emptyList()
-        }
-    } catch (e: Exception) {
-        emptyList()
-    }
-
-    private fun findAnnotation(element: PsiElement): List<String> {
-        val method = element::class.java.methods.find { it.name == "getAnnotationEntries" }
-        return (method?.invoke(element) as? List<*>)
-            ?.mapNotNull { it?.javaClass?.getMethod("getShortName")?.invoke(it)?.toString() }
-            ?: emptyList()
+    fun generateSpec(psiElement: PsiElement, importNames: List<String>, isPresent: Boolean): String {
+        val element = this.findElement(psiElement) ?: error("유효한 클래스 엘리먼트를 찾을 수 없습니다.: ${psiElement::class.simpleName}")
+        val generator = generators.firstOrNull { it.supports(element) } ?: error("적합한 생성기를 찾을 수 없습니다. : ${element::class.simpleName}")
+        return generator.generateSpec(element, importNames, isPresent)
     }
 
     private fun findElement(psiElement: PsiElement): PsiElement? {
         var tempPsiElement = psiElement
         while (tempPsiElement.parent != null) {
-            if (tempPsiElement.javaClass.name == "org.jetbrains.kotlin.psi.KtClass") {
+            if (tempPsiElement.javaClass.name == KT_CLASS_PACKAGE) {
                 return tempPsiElement
             }
 
-            if (tempPsiElement.javaClass.name == "org.jetbrains.kotlin.psi.KtNamedFunction") {
+            if (tempPsiElement.javaClass.name == KT_NAMED_FUNCTION_PACKAGE) {
                 return tempPsiElement
             }
 
@@ -62,14 +29,5 @@ class SpecGeneratorDispatcher(
         }
 
         return null
-    }
-
-    private fun determineComponentType(annotations: List<String>): ComponentType {
-        return when {
-            annotations.any { it.endsWith("RestController") || it.endsWith("Controller") } -> ComponentType.API
-            annotations.any { it.endsWith("Service") } -> ComponentType.SERVICE
-            annotations.any { it.endsWith("Repository") } -> ComponentType.REPOSITORY
-            else -> ComponentType.UNKNOWN
-        }
     }
 }

@@ -1,5 +1,6 @@
 package com.github.kadeyoo.kotestgenerator.util
 
+import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_NAMED_FUNCTION_PACKAGE
 import com.github.kadeyoo.kotestgenerator.dto.FunctionInfo
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNamedElement
@@ -8,7 +9,7 @@ import com.intellij.psi.util.PsiTreeUtil
 object FunctionExtractor {
     fun extractFromClass(psiClassElement: PsiElement): List<FunctionInfo> =
         PsiTreeUtil.findChildrenOfType(psiClassElement, PsiElement::class.java)
-            .filter { it.javaClass.name == "org.jetbrains.kotlin.psi.KtNamedFunction" }
+            .filter { it.javaClass.name == KT_NAMED_FUNCTION_PACKAGE }
             .mapNotNull { extractFromFunction(it) }
 
     fun extractFromFunction(psiElement: PsiElement): FunctionInfo? {

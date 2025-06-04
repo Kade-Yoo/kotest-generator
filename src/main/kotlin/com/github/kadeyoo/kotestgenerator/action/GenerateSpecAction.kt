@@ -3,11 +3,15 @@ package com.github.kadeyoo.kotestgenerator.action
 import com.github.kadeyoo.kotestgenerator.dispatcher.SpecGeneratorDispatcher
 import com.github.kadeyoo.kotestgenerator.service.ClassService
 import com.github.kadeyoo.kotestgenerator.service.MethodService
+import com.github.kadeyoo.kotestgenerator.util.CodeGeneratorUtil
+import com.intellij.codeInsight.actions.OptimizeImportsProcessor
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -18,6 +22,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.PsiManager
+import com.intellij.psi.codeStyle.JavaCodeStyleManager
 import com.intellij.psi.util.PsiTreeUtil
 
 /**
@@ -47,15 +52,25 @@ class GenerateSpecAction : AnAction() {
 
         // 동일한 이름의 테스트 파일이 이미 있는지 확인
         val findFile = finalTestDir.findFile(file.name)
-        val content = psiElement?.let { dispatcher.generateSpec(it, findFile != null) } ?: ""
+        val importNames = CodeGeneratorUtil.extractImportNamesFromFile(file)
+        val content = psiElement?.let { dispatcher.generateSpec(it, importNames, findFile != null) } ?: ""
 
-        WriteCommandAction.runWriteCommandAction(project) {
-            if (findFile != null) {
-                // 기존 파일이 있으면 파일 끝 '}' 앞에 자동 생성 코드 추가
-                appendContentToFile(project, findFile, content)
-            } else {
-                // 파일이 없으면 새로 생성
-                createNewSpecFile(project, file, content, finalTestDir)
+        ApplicationManager.getApplication().invokeAndWait {
+            WriteCommandAction.runWriteCommandAction(project) {
+                val createdFile: PsiFile
+                if (findFile != null) {
+                    // 기존 파일이 있으면 파일 끝 '}' 앞에 자동 생성 코드 추가
+                    createdFile = appendContentToFile(project, findFile, content)
+                } else {
+                    // 파일이 없으면 새로 생성
+                    createdFile = createNewFile(project, file, content, finalTestDir)
+                }
+
+                // 2. 파일 열기
+                this.openFileInEditor(project, createdFile)
+
+                // 3. 자동 임포트/최적화
+                this.optimizeImports(project, createdFile)
             }
         }
     }
@@ -87,7 +102,7 @@ class GenerateSpecAction : AnAction() {
     }
 
     /** 기존 파일에 코드 추가 */
-    private fun appendContentToFile(project: Project, findFile: PsiFile, content: String) {
+    private fun appendContentToFile(project: Project, findFile: PsiFile, content: String): PsiFile {
         val document = FileDocumentManager.getInstance().getDocument(findFile.virtualFile)
         if (document != null) {
             val insertOffset = document.text.lastIndexOf("}")
@@ -97,14 +112,20 @@ class GenerateSpecAction : AnAction() {
                 PsiDocumentManager.getInstance(project).commitDocument(document)
             }
         }
+
+        return findFile
     }
 
-    /** 새 파일 생성 */
-    private fun createNewSpecFile(
-        project: Project, file: PsiFile, content: String, finalTestDir: PsiDirectory
-    ) {
-        val newFile = PsiFileFactory.getInstance(project)
-            .createFileFromText(file.name, file.fileType, content)
-        finalTestDir.add(newFile)
+    private fun createNewFile(project: Project, file: PsiFile, content: String, finalTestDir: PsiDirectory): PsiFile {
+        val newFile = PsiFileFactory.getInstance(project).createFileFromText(file.name, file.fileType, content)
+        return finalTestDir.add(newFile) as PsiFile
+    }
+
+    private fun openFileInEditor(project: Project, file: PsiFile) {
+        FileEditorManager.getInstance(project).openFile(file.virtualFile, true)
+    }
+
+    private fun optimizeImports(project: Project, psiFile: PsiFile) {
+        OptimizeImportsProcessor(project, psiFile).run()
     }
 }
