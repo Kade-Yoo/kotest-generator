@@ -4,7 +4,6 @@ import com.github.kadeyoo.kotestgenerator.common.KotestGeneratorSettings
 import com.github.kadeyoo.kotestgenerator.common.code.ComponentType
 import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_CLASS_PACKAGE
 import com.github.kadeyoo.kotestgenerator.common.constants.Constants.KT_NAMED_FUNCTION_PACKAGE
-import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.GET_METHOD_NAME
 import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.GIVEN
 import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_BEHAVIOR_SPEC
 import com.github.kadeyoo.kotestgenerator.common.constants.SpecTemplateConstants.IMPORT_MOCKK_EVERY
@@ -58,7 +57,7 @@ object SpecTemplateUtil {
 
     private fun buildApiSpec(classInfo: ClassInfo, functionInfos: List<FunctionInfo>, isPresent: Boolean): String = buildString {
         if (isPresent) {
-            functionInfos.forEach { appendLine(buildApiTestBody(it)) }
+            functionInfos.forEach { appendLine(buildApiTestBody(it, classInfo.requestMappingUrl)) }
             return@buildString
         }
         if (classInfo.packageName.isNotBlank()) appendLine("package ${classInfo.packageName}")
@@ -83,30 +82,56 @@ object SpecTemplateUtil {
         appendLine("        .standaloneSetup(${classInfo.name}(${classInfo.parameters.joinToString(",") { it.first }})).build()")
         appendLine("    }")
         appendLine()
-        functionInfos.forEach { appendLine(buildApiTestBody(it)) }
+        functionInfos.forEach { appendLine(buildApiTestBody(it, classInfo.requestMappingUrl)) }
         appendLine("})")
     }
 
-    private fun buildApiTestBody(fn: FunctionInfo): String {
+    private fun buildApiTestBody(fn: FunctionInfo, prefixUrl: String): String {
         val (name, parameters, returnType, mappingInfo) = fn
-        val url = mappingInfo?.url ?: "/TODO"
-        val httpMethod = mappingInfo?.method ?: GET_METHOD_NAME
-        val urlParams = CodeGeneratorUtil.buildUrlParams(parameters)
+        val httpMethod = mappingInfo.method
         val paramDecl = CodeGeneratorUtil.buildParamDecl(parameters)
-        val fullUrl = if (urlParams.isNotBlank()) "\"$url?$urlParams\"" else "\"$url\""
         val badRequestParamDecl = CodeGeneratorUtil.buildBadParamDecl(parameters)
+
+        val pathVars = parameters.filter { it.annotations.contains("PathVariable") }
+        val requestParams = parameters.filter { it.annotations.contains("RequestParam") }
+        val requestBody = parameters.find { it.annotations.contains("RequestBody") }
+
+        val paramAssignments = requestParams.joinToString("&") {
+            "${it.name}=${CodeGeneratorUtil.dummyValue(it.type).replace("\"", "")}"
+        }.let { if (it.isNotEmpty()) "?$it" else "" }
+        val url = buildString {
+            append("\"$prefixUrl")
+            val regex = Regex("\\{\\w+}")
+            val variableNames = regex.findAll(mappingInfo.url).map { it.groupValues[0] }.toList()
+            val variables = pathVars.map { (CodeGeneratorUtil.dummyValue(it.type).replace("\"", "")) }.toList()
+            append(variableNames.zip(variables).fold(mappingInfo.url) { acc, (key, value) -> acc.replace(key, value) })
+            append(paramAssignments)
+            append("\"")
+        }
+
+        val bodyContent =
+            requestBody?.let {
+                buildString {
+                    appendLine("                    header { \"Content-Type\" to MediaType.APPLICATION_JSON }")
+                    appendLine("                    content { mapper.writeValueAsString(${it.name}) }")
+                }
+            } ?: ""
 
         return buildString {
             appendLine("    $GIVEN(\"$name API 호출 시\") {")
-            if (paramDecl.isNotBlank()) appendLine("        $paramDecl")
+            if (paramDecl.isNotBlank()) appendLine(paramDecl)
             appendLine("        // TODO: mock 반환값/로직 실제에 맞게 수정해주세요.")
-            appendLine("        val expected: $returnType = ApiResponse(data = emptyList()) ")
+            appendLine("        val expected: $returnType = ${CodeGeneratorUtil.dummyValue(returnType).replace("\"", "")} // TODO: 실제 값으로 변경")
             appendLine()
             appendLine("        // TODO: service mock 반환값/로직 실제에 맞게 수정해주세요.")
             appendLine("        every {  }")
             appendLine("        $WHEN(\"정상적인 요청을 보낼 경우\") {")
-            appendLine("            val result = mockMvc.${httpMethod}($fullUrl) // TODO: post/put/delete 등도 지원")
-            appendLine("                .andExpect { status { isOk() } }")
+            appendLine("            // TODO: 실제 URL에 맞게 수정해주세요.")
+            appendLine("            val result = mockMvc.${httpMethod}($url)")
+            appendLine("                .andExpect { ")
+            appendLine("                    status { isOk() } ")
+            if (bodyContent.isNotEmpty()) append(bodyContent)
+            appendLine("                }")
             appendLine("                .andReturn()")
             appendLine()
             appendLine("            // TODO: 실제 응답 코드에 맞게 수정해주세요.")
@@ -121,11 +146,14 @@ object SpecTemplateUtil {
             appendLine("            }")
             appendLine("        }")
             appendLine()
-            appendLine("        // 예외 케이스: 존재하지 않는 값으로 요청")
             appendLine("        $WHEN(\"존재하지 않는 값으로 요청하면\") {")
-            if (badRequestParamDecl.isNotBlank()) appendLine("            $badRequestParamDecl")
-            appendLine("            val result = mockMvc.${httpMethod}($fullUrl) // TODO: post/put/delete 등도 지원")
-            appendLine("                .andExpect { status { isBadRequest() } }")
+            if (badRequestParamDecl.isNotBlank()) appendLine(badRequestParamDecl)
+            appendLine("            // TODO: 실제 URL에 맞게 수정해주세요.")
+            appendLine("            val result = mockMvc.${httpMethod}($url)")
+            appendLine("                .andExpect { ")
+            appendLine("                    status { isBadRequest() } ")
+            if (bodyContent.isNotEmpty()) append(bodyContent)
+            appendLine("                 }")
             appendLine("                .andReturn()")
             appendLine()
             appendLine("            $THEN(\"400 Bad Request 가 반환된다\") {")
@@ -158,8 +186,10 @@ object SpecTemplateUtil {
 
     private fun buildServiceTestBody(fn: FunctionInfo): String {
         val (name, parameters, returnType) = fn
-        val paramDecl = parameters.joinToString(", ") { (n, t) -> "val $n = ${CodeGeneratorUtil.dummyValue(t)}" }
-        val paramList = parameters.joinToString(", ") { it.first }
+        val paramDecl = parameters.joinToString(", ") { (n, t, parameterImport) -> "val $n = ${CodeGeneratorUtil.dummyValue(
+            t
+        )}" }
+        val paramList = parameters.joinToString(", ") { it.name }
         val expected = CodeGeneratorUtil.expectedValue(returnType)
         val notFoundParamList = parameters.joinToString(", ") { (n, t) ->
             when (t) {
@@ -265,4 +295,32 @@ object SpecTemplateUtil {
             ?.mapNotNull { it?.javaClass?.getMethod("getShortName")?.invoke(it)?.toString() }
             ?: emptyList()
     }
+
+    fun findFieldParameter(element: PsiElement): List<String> {
+        val method = element::class.java.methods.find { it.name == "getProperties" }
+        return (method?.invoke(element) as? List<*>)
+            ?.mapNotNull { it?.javaClass?.getMethod("getName")?.invoke(it)?.toString() }
+            ?: emptyList()
+    }
+
+//    fun getAllPropertiesAndConstructorParams(ktClass: KtClass): List<Pair<String, String>> {
+//        val properties = ktClass.getProperties().mapNotNull {
+//            val name = it.name ?: return@mapNotNull null
+//            val type = it.typeReference?.text ?: "Any"
+//            name to type
+//        }
+//
+//        val constructorParams = ktClass.primaryConstructorParameters.mapNotNull {
+//            // 주 생성자 파라미터이면서 프로퍼티(val/var)인 경우만 포함
+//            if (it.hasValOrVar()) {
+//                val name = it.name ?: return@mapNotNull null
+//                val type = it.typeReference?.text ?: "Any"
+//                name to type
+//            } else null
+//        }
+//
+//        // 둘을 합쳐서 반환(중복 제거하려면 toMap().entries.map { ... } 등 활용)
+//        return (properties + constructorParams)
+//            .distinctBy { it.first } // 이름 기준 중복제거
+//    }
 }

@@ -16,10 +16,10 @@ class ClassService : CodeSpecGenerator {
         psiElement.javaClass.name == KT_CLASS_PACKAGE
 
     override fun generateSpec(psiElement: PsiElement, importNames: List<String>, isPresent: Boolean): String {
-        val classInfo = ClassExtractor.extractClassInfoByReflection(psiElement, importNames)
+        val classInfo = ClassExtractor.extractClassInfoOfClass(psiElement, importNames)
         val annotationNames = SpecTemplateUtil.findAnnotations(psiElement)
         val componentType = ComponentType.determineByAnnotations(annotationNames)
-        val functionInfo = FunctionExtractor.extractFromClass(psiElement)
+        val functionInfo = FunctionExtractor.extractFromClass(psiElement, importNames)
         return SpecTemplateUtil.generateSpec(classInfo, functionInfo, componentType, isPresent)
     }
 }

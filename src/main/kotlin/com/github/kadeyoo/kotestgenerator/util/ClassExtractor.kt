@@ -7,12 +7,25 @@ import com.intellij.psi.PsiNamedElement
 
 object ClassExtractor {
 
-    fun extractClassInfoByReflection(psiClass: PsiElement, importNames: List<String>): ClassInfo {
-        val name = (psiClass as? PsiNamedElement)?.name ?: "className"
-        val packageName = JavaDirectoryService.getInstance().getPackage(psiClass.containingFile.containingDirectory)?.qualifiedName
-        val primaryConstructorMethod = psiClass.javaClass.methods.firstOrNull { it.name == "getPrimaryConstructor" }
-        val primaryConstructor = primaryConstructorMethod?.invoke(psiClass)
-        val valueParametersMethod = primaryConstructor?.javaClass?.methods?.firstOrNull { it.name == "getValueParameters" }
+    fun extractClassInfoOfClass(psiClass: PsiElement, importNames: List<String>): ClassInfo {
+        return generateClassInfo(psiClass, importNames)
+    }
+
+    fun extractClassInfoOfMethod(psiElement: PsiElement, importNames: List<String>): ClassInfo {
+        val classElement = psiElement.parent.parent
+        return generateClassInfo(classElement, importNames)
+    }
+
+    private fun generateClassInfo(classElement: PsiElement, importNames: List<String>): ClassInfo {
+        val name = (classElement as? PsiNamedElement)?.name ?: "className"
+        val packageName = JavaDirectoryService.getInstance().getPackage(classElement.containingFile.containingDirectory)?.qualifiedName
+        val annotations = classElement.children.filter { it.text.contains("@RequestMapping") }
+        val requestMappingRegex = Regex("@RequestMapping\\(\"([^\"]+)\"\\)")
+        val classUrl = annotations.firstNotNullOfOrNull { requestMappingRegex.find(it.text)?.groupValues?.get(1) } ?: ""
+        val primaryConstructorMethod = classElement.javaClass.methods.firstOrNull { it.name == "getPrimaryConstructor" }
+        val primaryConstructor = primaryConstructorMethod?.invoke(classElement)
+        val valueParametersMethod =
+            primaryConstructor?.javaClass?.methods?.firstOrNull { it.name == "getValueParameters" }
         val valueParameters = valueParametersMethod?.invoke(primaryConstructor) as? List<*>
         val parameters = valueParameters?.map { param ->
             val parameterName = param?.javaClass?.getMethod("getName")?.invoke(param) as? String ?: "param"
@@ -20,6 +33,6 @@ object ClassExtractor {
             val typeText = typeRef?.javaClass?.getMethod("getText")?.invoke(typeRef) as? String ?: "Any"
             parameterName to typeText
         } ?: emptyList()
-        return ClassInfo(name, parameters, importNames, packageName ?: "com.example")
+        return ClassInfo(name, parameters, importNames, packageName ?: "com.example", classUrl)
     }
 }

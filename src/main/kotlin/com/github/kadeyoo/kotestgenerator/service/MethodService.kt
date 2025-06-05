@@ -16,8 +16,8 @@ class MethodService: CodeSpecGenerator {
         psiElement.javaClass.name == KT_NAMED_FUNCTION_PACKAGE
 
     override fun generateSpec(psiElement: PsiElement, importNames: List<String>, isPresent: Boolean): String {
-        val classInfo = ClassExtractor.extractClassInfoByReflection(psiElement, importNames)
-        val functionInfo = FunctionExtractor.extractFromFunction(psiElement) ?: error("Not a function")
+        val classInfo = ClassExtractor.extractClassInfoOfMethod(psiElement, importNames)
+        val functionInfo = FunctionExtractor.extractFromFunction(psiElement, importNames) ?: error("유효한 함수 정보를 찾을 수 없습니다")
         val annotationNames = SpecTemplateUtil.findAnnotations(psiElement)
         val componentType = ComponentType.determineByAnnotations(annotationNames)
         return SpecTemplateUtil.generateSpec(classInfo, listOf(functionInfo), componentType, isPresent)

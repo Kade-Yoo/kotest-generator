@@ -10,6 +10,7 @@ object SpecTemplateConstants {
     const val IMPORT_BEHAVIOR_SPEC = "import io.kotest.core.spec.style.BehaviorSpec"
     const val IMPORT_MOCKK_EVERY = "import io.mockk.every"
     const val IMPORT_HTTP_STATUS = "import org.springframework.http.HttpStatus"
+    const val IMPORT_MEDIA_TYPE = "import org.springframework.http.MediaType"
     const val IMPORT_JACKSON_OBJECT_MAPPTER = "import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper"
     const val IMPORT_READ_VALUE = "import com.fasterxml.jackson.module.kotlin.readValue"
     const val IMPORT_SHOULD_BE_EQUAL = "import io.kotest.matchers.equals.shouldBeEqual"
@@ -33,16 +34,7 @@ object SpecTemplateConstants {
     const val MOCKK_EVERY_COMMENT = "// TODO: mock 반환값/로직 실제에 맞게 수정"
     const val MOCKK_THROW_COMMENT = "// TODO: 실제 로직에 맞게 mock 세팅"
 
-    const val GET_MAPPING_ANNOTATION = "@GetMapping"
-    const val POST_MAPPING_ANNOTATION = "@PostMapping"
-    const val PUT_MAPPING_ANNOTATION = "@PutMapping"
-    const val DELETE_MAPPING_ANNOTATION = "@DeleteMapping"
-    const val REQUEST_MAPPING_ANNOTATION = "@RequestMapping"
-
     const val GET_METHOD_NAME = "get"
-    const val POST_METHOD_NAME = "post"
-    const val PUT_METHOD_NAME = "put"
-    const val DELETE_METHOD_NAME = "delete"
 
     const val VALID_RESPONSE_STATUS_IS_OK = "result.response.status shouldBe HttpStatus.OK.value()"
     const val VALID_RESPONSE_STATUS_IS_BAD_REQUEST = "result.response.status shouldBe HttpStatus.BAD_REQUEST.value()"
@@ -52,10 +44,5 @@ object SpecTemplateConstants {
          * ⚠️ 실제 서비스 상황에 맞게 파라미터, mock, 예외 타입, 응답 검증 코드를 수정하세요!
          * 옵션: 플러그인 설정(톱니바퀴 버튼)에서 코드 스타일, 네이밍, mock 종류 등을 선택할 수 있습니다.
          */
-    """.trimIndent()
-
-    val VALID_RESPONSE_DATA = """
-        val responseData = mapper.readValue<Any>(result.response.contentAsByteArray)
-        responseData shouldBe expected
     """.trimIndent()
 }
