@@ -295,32 +295,4 @@ object SpecTemplateUtil {
             ?.mapNotNull { it?.javaClass?.getMethod("getShortName")?.invoke(it)?.toString() }
             ?: emptyList()
     }
-
-    fun findFieldParameter(element: PsiElement): List<String> {
-        val method = element::class.java.methods.find { it.name == "getProperties" }
-        return (method?.invoke(element) as? List<*>)
-            ?.mapNotNull { it?.javaClass?.getMethod("getName")?.invoke(it)?.toString() }
-            ?: emptyList()
-    }
-
-//    fun getAllPropertiesAndConstructorParams(ktClass: KtClass): List<Pair<String, String>> {
-//        val properties = ktClass.getProperties().mapNotNull {
-//            val name = it.name ?: return@mapNotNull null
-//            val type = it.typeReference?.text ?: "Any"
-//            name to type
-//        }
-//
-//        val constructorParams = ktClass.primaryConstructorParameters.mapNotNull {
-//            // 주 생성자 파라미터이면서 프로퍼티(val/var)인 경우만 포함
-//            if (it.hasValOrVar()) {
-//                val name = it.name ?: return@mapNotNull null
-//                val type = it.typeReference?.text ?: "Any"
-//                name to type
-//            } else null
-//        }
-//
-//        // 둘을 합쳐서 반환(중복 제거하려면 toMap().entries.map { ... } 등 활용)
-//        return (properties + constructorParams)
-//            .distinctBy { it.first } // 이름 기준 중복제거
-//    }
 }
