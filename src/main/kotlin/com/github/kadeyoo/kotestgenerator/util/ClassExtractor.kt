@@ -3,6 +3,7 @@ package com.github.kadeyoo.kotestgenerator.util
 import com.github.kadeyoo.kotestgenerator.dto.ClassInfo
 import com.intellij.psi.JavaDirectoryService
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiNamedElement
 
 object ClassExtractor {
@@ -31,8 +32,24 @@ object ClassExtractor {
             val parameterName = param?.javaClass?.getMethod("getName")?.invoke(param) as? String ?: "param"
             val typeRef = param?.javaClass?.getMethod("getTypeReference")?.invoke(param)
             val typeText = typeRef?.javaClass?.getMethod("getText")?.invoke(typeRef) as? String ?: "Any"
-            parameterName to typeText
+            ClassInfo.ParameterInfo(name = parameterName, type = typeText)
         } ?: emptyList()
         return ClassInfo(name, parameters, importNames, packageName ?: "com.example", classUrl)
+    }
+
+    fun extractImportNamesFromFile(psiFile: PsiFile): List<String> {
+        val importListObj = extractImportsFromFile(psiFile) ?: return emptyList()
+        val getImportsMethod = importListObj.javaClass.methods.firstOrNull { it.name == "getImports" }
+        val importDirectives = getImportsMethod?.invoke(importListObj) as? List<*>
+        return importDirectives?.mapNotNull { importDirective ->
+            val getFqNameMethod = importDirective?.javaClass?.methods?.firstOrNull { it.name == "getImportedFqName" }
+            val fqNameObj = getFqNameMethod?.invoke(importDirective)
+            fqNameObj?.toString()
+        } ?: emptyList()
+    }
+
+    private fun extractImportsFromFile(psiFile: PsiFile): Any? {
+        val getImportListMethod = psiFile.javaClass.methods.firstOrNull { it.name == "getImportList" }
+        return getImportListMethod?.invoke(psiFile)
     }
 }

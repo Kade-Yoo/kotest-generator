@@ -65,21 +65,20 @@ object SpecTemplateUtil {
         appendLine("import ${classInfo.packageName}.${classInfo.name}")
         appendLine(CodeGeneratorUtil.apiImportStatements())
         classInfo.importNames.forEach { appendLine("import $it") }
-        appendLine(state.getMockLibImport())
         appendLine(TEST_COMMENT)
         appendLine("@WebMvcTest(${classInfo.name}::class)")
         appendLine("@AutoConfigureMockMvc")
         appendLine("class ${classInfo.name}Test : BehaviorSpec({")
         appendLine()
         appendLine("    val mapper= jacksonObjectMapper()")
-        classInfo.parameters.forEach { pair ->
-            appendLine("    val ${pair.first}: ${pair.second} = mockk()")
+        classInfo.parameters.forEach {
+            appendLine("    val ${it.name}: ${it.type} = mockk()")
         }
         appendLine("    lateinit var mockMvc: MockMvc")
         appendLine()
         appendLine("    beforeTest {")
         appendLine("    mockMvc = MockMvcBuilders")
-        appendLine("        .standaloneSetup(${classInfo.name}(${classInfo.parameters.joinToString(",") { it.first }})).build()")
+        appendLine("        .standaloneSetup(${classInfo.name}(${classInfo.parameters.joinToString(",") { it.name }})).build()")
         appendLine("    }")
         appendLine()
         functionInfos.forEach { appendLine(buildApiTestBody(it, classInfo.requestMappingUrl)) }
@@ -92,23 +91,21 @@ object SpecTemplateUtil {
         val paramDecl = CodeGeneratorUtil.buildParamDecl(parameters)
         val badRequestParamDecl = CodeGeneratorUtil.buildBadParamDecl(parameters)
 
-        val pathVars = parameters.filter { it.annotations.contains("PathVariable") }
         val requestParams = parameters.filter { it.annotations.contains("RequestParam") }
-        val requestBody = parameters.find { it.annotations.contains("RequestBody") }
-
         val paramAssignments = requestParams.joinToString("&") {
             "${it.name}=${CodeGeneratorUtil.dummyValue(it.type).replace("\"", "")}"
         }.let { if (it.isNotEmpty()) "?$it" else "" }
-        val url = buildString {
-            append("\"$prefixUrl")
-            val regex = Regex("\\{\\w+}")
-            val variableNames = regex.findAll(mappingInfo.url).map { it.groupValues[0] }.toList()
-            val variables = pathVars.map { (CodeGeneratorUtil.dummyValue(it.type).replace("\"", "")) }.toList()
-            append(variableNames.zip(variables).fold(mappingInfo.url) { acc, (key, value) -> acc.replace(key, value) })
-            append(paramAssignments)
-            append("\"")
-        }
 
+        val badParamAssignments = requestParams.joinToString("&") {
+            "${it.name}=${CodeGeneratorUtil.badDummyValue(it.type).replace("\"", "")}"
+
+        }.let { if (it.isNotEmpty()) "?$it" else "" }
+
+        val pathVars = parameters.filter { it.annotations.contains("PathVariable") }
+        val goodUrl = generateFullUrl(prefixUrl, mappingInfo.url, pathVars.map { it.type }, true,  paramAssignments)
+        val badUrl = generateFullUrl(prefixUrl, mappingInfo.url, pathVars.map { it.type }, false,  badParamAssignments)
+
+        val requestBody = parameters.find { it.annotations.contains("RequestBody") }
         val bodyContent =
             requestBody?.let {
                 buildString {
@@ -127,7 +124,7 @@ object SpecTemplateUtil {
             appendLine("        every {  }")
             appendLine("        $WHEN(\"정상적인 요청을 보낼 경우\") {")
             appendLine("            // TODO: 실제 URL에 맞게 수정해주세요.")
-            appendLine("            val result = mockMvc.${httpMethod}($url)")
+            appendLine("            val result = mockMvc.${httpMethod}($goodUrl)")
             appendLine("                .andExpect { ")
             appendLine("                    status { isOk() } ")
             if (bodyContent.isNotEmpty()) append(bodyContent)
@@ -142,14 +139,14 @@ object SpecTemplateUtil {
             appendLine("            // TODO: 실제 응답 값에 맞게 수정해주세요.")
             appendLine("            $THEN(\"정상 결과를 반환한다\") {")
             appendLine("                val responseData = mapper.readValue<${returnType}>(result.response.contentAsByteArray)")
-            appendLine("                responseData.data shouldBe expected.data // TODO: 실제 값에 맞게 검증")
+            appendLine("                responseData shouldBe expected // TODO: 실제 값에 맞게 검증")
             appendLine("            }")
             appendLine("        }")
             appendLine()
             appendLine("        $WHEN(\"존재하지 않는 값으로 요청하면\") {")
             if (badRequestParamDecl.isNotBlank()) appendLine(badRequestParamDecl)
             appendLine("            // TODO: 실제 URL에 맞게 수정해주세요.")
-            appendLine("            val result = mockMvc.${httpMethod}($url)")
+            appendLine("            val result = mockMvc.${httpMethod}($badUrl)")
             appendLine("                .andExpect { ")
             appendLine("                    status { isBadRequest() } ")
             if (bodyContent.isNotEmpty()) append(bodyContent)
@@ -166,68 +163,58 @@ object SpecTemplateUtil {
 
     private fun buildServiceSpec(classInfo: ClassInfo, functionInfos: List<FunctionInfo>, isPresent: Boolean): String = buildString {
         if (isPresent) {
-            functionInfos.forEach { appendLine(buildServiceTestBody(it)) }
+            functionInfos.forEach { appendLine(buildServiceTestBody(it, classInfo.parameters)) }
             return@buildString
         }
         appendLine(TEST_COMMENT)
-        if (classInfo.packageName.isNotBlank()) appendLine("package $classInfo.packageName")
+        if (classInfo.packageName.isNotBlank()) appendLine("package ${classInfo.packageName}")
         appendLine()
-        appendLine(IMPORT_BEHAVIOR_SPEC)
-        appendLine(IMPORT_MOCKK_EVERY)
-        appendLine(state.getMockLibImport())
+        appendLine(CodeGeneratorUtil.apiImportStatements())
+        classInfo.importNames.forEach { appendLine("import $it") }
         appendLine()
         appendLine("class ${classInfo.name}Test : BehaviorSpec({")
-        classInfo.parameters.forEach { pair ->
-            appendLine("    val ${pair.first}: ${pair.second} = mockk()")
-        }
-        functionInfos.forEach { appendLine(buildServiceTestBody(it)) }
+        classInfo.parameters.forEach { appendLine("    val ${it.name}: ${it.type} = mockk(relaxed = true)") }
+        appendLine("    val service = ${classInfo.name}(${classInfo.parameters.joinToString(", ") { it.name }})")
+        functionInfos.forEach { appendLine(buildServiceTestBody(it, classInfo.parameters)) }
         appendLine("})")
     }
 
-    private fun buildServiceTestBody(fn: FunctionInfo): String {
-        val (name, parameters, returnType) = fn
-        val paramDecl = parameters.joinToString(", ") { (n, t, parameterImport) -> "val $n = ${CodeGeneratorUtil.dummyValue(
-            t
-        )}" }
+    private fun buildServiceTestBody(fn: FunctionInfo, classParameter: List<ClassInfo.ParameterInfo>): String {
+        val (name, parameters, returnType, _, dependencyCall) = fn
+        val paramDecl = parameters.joinToString("\n") { "        val ${it.name}:${it.type} = ${CodeGeneratorUtil.dummyValue(it.type)}" }
         val paramList = parameters.joinToString(", ") { it.name }
         val expected = CodeGeneratorUtil.expectedValue(returnType)
-        val notFoundParamList = parameters.joinToString(", ") { (n, t) ->
-            when (t) {
-                "Long", "Int" -> "-1"
-                "String" -> "\"\""
-                else -> CodeGeneratorUtil.dummyValue(t)
-            }
-        }
+        val notFoundParamList = parameters.joinToString(", ") { CodeGeneratorUtil.badDummyValue(it.type) }
+        val everyStatements = CodeGeneratorUtil.generateMockStubsFromClassInfo(classParameter, dependencyCall)
 
         return buildString {
-            appendLine("$GIVEN(\"$name 에 유효한 정보를 입력하고\") {")
-            // 기존 단일 정상/예외 케이스
-            if (paramDecl.isNotBlank()) appendLine("    $paramDecl")
-            if (expected.isNotBlank()) appendLine("    $expected")
-            if (expected.isNotBlank()) appendLine("     // TODO: mock 반환값/로직 실제에 맞게 수정해주세요.")
-            if (expected.isNotBlank()) appendLine("     every { }")
+            appendLine("    $GIVEN(\"$name 에 유효한 정보를 입력하고\") {")
+            if (paramDecl.isNotBlank()) appendLine(paramDecl)
+            if (expected.isNotBlank()) appendLine("        $expected")
+            if (expected.isNotBlank()) appendLine("        // TODO: mock 반환값/로직 실제에 맞게 수정해주세요.")
+            everyStatements.forEach { appendLine("        $it") }
             appendLine()
             appendLine("        $WHEN(\"조회하면\") {")
-            val result = if (returnType == "Unit") "service.$name($paramList)" else "    val result = service.$name($paramList)"
-            appendLine("            $$THEN(\"정상 결과가 반환되어야 한다\") {")
+            appendLine("            $THEN(\"정상 결과가 반환되어야 한다\") {")
+            val result = if (returnType == "Unit") "service.$name($paramList)" else "val result = service.$name($paramList)"
             appendLine("                $result")
             if (expected.isNotBlank()) appendLine("                result shouldBe expected // TODO: 실제 값에 맞게 검증")
             appendLine("            }")
             appendLine("        }")
             appendLine()
-            appendLine("        every { repository.$name($notFoundParamList) } returns null")
-            appendLine("        $WHEN(\"존재하지 않는 ID로 인해 에러가 발생한다면\") {")
-            appendLine("            $$THEN(\"예외가 발생해야 한다\") {")
+            everyStatements.forEach { appendLine("        $it") }
+            appendLine("        $WHEN(\"존재하지 않는 ID로 인해\") {")
+            appendLine("            $THEN(\"예외가 발생해야 한다\") {")
             appendLine("                // TODO: 예외 타입에 맞게 수정")
             appendLine("                shouldThrow<Exception> {")
             appendLine("                    service.$name($notFoundParamList)")
             appendLine("                }")
             appendLine("            }")
             appendLine("        }")
+//            for ((paramName, type) in parameters) {
+//                append(buildParameterScenarioBlock(paramName, type))
+//            }
             appendLine("    }")
-            for ((paramName, type) in parameters) {
-                append(buildParameterScenarioBlock(paramName, type))
-            }
         }
     }
 
@@ -264,28 +251,25 @@ object SpecTemplateUtil {
 
     private fun scenarioCasesForType(type: String): List<Pair<String, String>> = when (type) {
         "Long", "Int" -> listOf(
-            "정상값" to "1",
-            "음수" to "-1",
-            "최대값" to "Long.MAX_VALUE",
-            "null" to "null"
+            "정상값" to CodeGeneratorUtil.dummyValue(type),
+            "음수" to CodeGeneratorUtil.badDummyValue(type),
         )
         "String" -> listOf(
-            "정상값" to "\"abc\"",
-            "빈값" to "\"\"",
-            "null" to "null"
+            "정상값" to CodeGeneratorUtil.dummyValue(type),
+            "빈값" to CodeGeneratorUtil.badDummyValue(type),
         )
-        else -> listOf("기본값" to "$type()")
+        else -> listOf("기본값" to CodeGeneratorUtil.dummyValue(type))
     }
 
     private fun buildParameterScenarioBlock(paramName: String, type: String): String = buildString {
         val cases = scenarioCasesForType(type)
         for ((desc, value) in cases) {
-            appendLine("    $WHEN(\"$paramName: $desc\") {")
-            appendLine("        $$THEN(\"적절한 응답이 반환된다\") {")
-            appendLine("            val $paramName = $value")
-            appendLine("            // TODO: 실제 메소드 호출 및 검증")
+            appendLine("        $WHEN(\"$paramName: $desc\") {")
+            appendLine("            $THEN(\"적절한 응답이 반환된다\") {")
+            appendLine("                val $paramName = $value")
+            appendLine("                // TODO: 실제 메소드 호출 및 검증")
+            appendLine("            }")
             appendLine("        }")
-            appendLine("    }")
         }
     }
 
@@ -295,4 +279,23 @@ object SpecTemplateUtil {
             ?.mapNotNull { it?.javaClass?.getMethod("getShortName")?.invoke(it)?.toString() }
             ?: emptyList()
     }
+
+    private fun generateUrl(url: String, pathVars: List<String>, isGoodUrl: Boolean): String {
+        val regex = Regex("\\{\\w+}")
+        val variableNames = regex.findAll(url).map { it.groupValues[0] }.toList()
+        val variables = pathVars.map {
+            if (isGoodUrl) CodeGeneratorUtil.dummyValue(it).replace("\"", "")
+            else CodeGeneratorUtil.badDummyValue(it).replace("\"", "") }.toList()
+        return variableNames.zip(variables).fold(url) { acc, (key, value) -> acc.replace(key, value) }
+    }
+
+    private fun generateFullUrl(
+        prefixUrl: String, url: String, pathVars: List<String>, isGoodUrl: Boolean, paramAssignments: String
+    ): String =
+        buildString {
+            append("\"$prefixUrl")
+            append(generateUrl(url, pathVars.map { it }, isGoodUrl))
+            append(paramAssignments)
+            append("\"")
+        }
 }

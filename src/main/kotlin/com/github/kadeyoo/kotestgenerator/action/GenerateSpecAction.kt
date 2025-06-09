@@ -3,7 +3,7 @@ package com.github.kadeyoo.kotestgenerator.action
 import com.github.kadeyoo.kotestgenerator.dispatcher.SpecGeneratorDispatcher
 import com.github.kadeyoo.kotestgenerator.service.ClassService
 import com.github.kadeyoo.kotestgenerator.service.MethodService
-import com.github.kadeyoo.kotestgenerator.util.CodeGeneratorUtil
+import com.github.kadeyoo.kotestgenerator.util.ClassExtractor
 import com.intellij.codeInsight.actions.OptimizeImportsProcessor
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -52,7 +52,7 @@ class GenerateSpecAction : AnAction() {
 
         // 동일한 이름의 테스트 파일이 이미 있는지 확인
         val findFile = finalTestDir.findFile(file.name)
-        val importNames = CodeGeneratorUtil.extractImportNamesFromFile(file)
+        val importNames = ClassExtractor.extractImportNamesFromFile(file)
         val content = psiElement?.let { dispatcher.generateSpec(it, importNames, findFile != null) } ?: ""
 
         ApplicationManager.getApplication().invokeAndWait {

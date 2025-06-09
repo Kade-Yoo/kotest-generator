@@ -5,4 +5,12 @@ data class FunctionInfo(
     val parameters: List<ParameterInfo>,
     val returnType: String,
     val mappingInfo: MappingInfo,
-)
+    val dependencyCall: List<DependencyCall> = emptyList()
+) {
+    data class DependencyCall(
+        val name: String,
+        val methodCall: String,
+        val parameters: List<String>,
+        val returnType: String
+    )
+}

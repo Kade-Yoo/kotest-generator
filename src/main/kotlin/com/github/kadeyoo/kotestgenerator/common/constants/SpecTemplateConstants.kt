@@ -8,6 +8,8 @@ object SpecTemplateConstants {
     const val IMPORT_REQUEST_BUILDERS_GET = "import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get"
     const val IMPORT_RESULT_MATCHERS_STATUS = "import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status"
     const val IMPORT_BEHAVIOR_SPEC = "import io.kotest.core.spec.style.BehaviorSpec"
+    const val IMPORT_MOCKK = "import io.mockk.mockk"
+    const val IMPORT_MOCKITO = "import org.mockito.Mockito"
     const val IMPORT_MOCKK_EVERY = "import io.mockk.every"
     const val IMPORT_HTTP_STATUS = "import org.springframework.http.HttpStatus"
     const val IMPORT_MEDIA_TYPE = "import org.springframework.http.MediaType"
@@ -20,6 +22,7 @@ object SpecTemplateConstants {
     const val IMPORT_PUT = "import org.springframework.test.web.servlet.put"
     const val IMPORT_DELETE = "import org.springframework.test.web.servlet.delete"
     const val IMPORT_GET = "import org.springframework.test.web.servlet.get"
+    const val IMPORT_ASSERT_THROW = "import io.kotest.assertions.throwables.shouldThrow"
 
     const val GIVEN = "given"
     const val WHEN = "`when`"
