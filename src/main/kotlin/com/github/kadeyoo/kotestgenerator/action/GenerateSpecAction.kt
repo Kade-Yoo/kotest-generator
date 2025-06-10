@@ -51,7 +51,7 @@ class GenerateSpecAction : AnAction() {
         )
 
         // 동일한 이름의 테스트 파일이 이미 있는지 확인
-        val findFile = finalTestDir.findFile(file.name)
+        val findFile = finalTestDir.findFile(file.name.replace(".kt", "Test.kt"))
         val importNames = ClassExtractor.extractImportNamesFromFile(file)
         val content = psiElement?.let { dispatcher.generateSpec(it, importNames, findFile != null) } ?: ""
 
@@ -117,7 +117,11 @@ class GenerateSpecAction : AnAction() {
     }
 
     private fun createNewFile(project: Project, file: PsiFile, content: String, finalTestDir: PsiDirectory): PsiFile {
-        val newFile = PsiFileFactory.getInstance(project).createFileFromText(file.name, file.fileType, content)
+        val newFile = PsiFileFactory.getInstance(project).createFileFromText(
+            file.name.replace(".kt", "Test.kt"),
+            file.fileType,
+            content
+        )
         return finalTestDir.add(newFile) as PsiFile
     }
 

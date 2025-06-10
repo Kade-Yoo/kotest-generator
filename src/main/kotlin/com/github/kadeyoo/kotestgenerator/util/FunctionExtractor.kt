@@ -59,7 +59,7 @@ object FunctionExtractor {
     }
 
     private fun extractMappingInfo(method: PsiElement): MappingInfo {
-        val pattern = Regex("@(GetMapping|PostMapping|PutMapping|DeleteMapping)\\(\"([^\"]+)\"\\)")
+        val pattern = Regex("@(GetMapping|PostMapping|PutMapping|DeleteMapping)(\\(\"([^\"]*)\"\\))?")
         // method의 자식 중 어노테이션이 포함된 요소만 필터링
         val annotationElements = method.children.filter {
             it.children.any { child -> child.javaClass.name.contains("Annotation") }
@@ -68,8 +68,11 @@ object FunctionExtractor {
         for (annotation in annotationElements) {
             val match = pattern.find(annotation.text) ?: continue
             val httpMethod = match.groupValues[1]
-            val url = match.groupValues[2]
+            var url = match.groupValues.getOrNull(3) ?: ""
 
+            if (!url.contains("/")) {
+                url = url.replace("{", "/{")
+            }
             return MappingInfo(url, httpMethod.removeSuffix("Mapping").lowercase())
         }
 

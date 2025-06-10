@@ -72,7 +72,7 @@ object SpecTemplateUtil {
         appendLine()
         appendLine("    val mapper= jacksonObjectMapper()")
         classInfo.parameters.forEach {
-            appendLine("    val ${it.name}: ${it.type} = mockk()")
+            appendLine("    val ${it.name}: ${it.type} = mockk(relaxed = true)")
         }
         appendLine("    lateinit var mockMvc: MockMvc")
         appendLine()
@@ -109,8 +109,9 @@ object SpecTemplateUtil {
         val bodyContent =
             requestBody?.let {
                 buildString {
-                    appendLine("                    header { \"Content-Type\" to MediaType.APPLICATION_JSON }")
-                    appendLine("                    content { mapper.writeValueAsString(${it.name}) }")
+                    appendLine("                    accept = MediaType.APPLICATION_JSON")
+                    appendLine("                    contentType = MediaType.APPLICATION_JSON")
+                    appendLine("                    content = mapper.writeValueAsString(${it.name})")
                 }
             } ?: ""
 
@@ -121,13 +122,13 @@ object SpecTemplateUtil {
             appendLine("        val expected: $returnType = ${CodeGeneratorUtil.dummyValue(returnType).replace("\"", "")} // TODO: 실제 값으로 변경")
             appendLine()
             appendLine("        // TODO: service mock 반환값/로직 실제에 맞게 수정해주세요.")
-            appendLine("        every {  }")
             appendLine("        $WHEN(\"정상적인 요청을 보낼 경우\") {")
             appendLine("            // TODO: 실제 URL에 맞게 수정해주세요.")
-            appendLine("            val result = mockMvc.${httpMethod}($goodUrl)")
+            appendLine("            val result = mockMvc.${httpMethod}($goodUrl) {")
+            if (bodyContent.isNotEmpty()) append(bodyContent)
+            appendLine("            }")
             appendLine("                .andExpect { ")
             appendLine("                    status { isOk() } ")
-            if (bodyContent.isNotEmpty()) append(bodyContent)
             appendLine("                }")
             appendLine("                .andReturn()")
             appendLine()
@@ -146,10 +147,11 @@ object SpecTemplateUtil {
             appendLine("        $WHEN(\"존재하지 않는 값으로 요청하면\") {")
             if (badRequestParamDecl.isNotBlank()) appendLine(badRequestParamDecl)
             appendLine("            // TODO: 실제 URL에 맞게 수정해주세요.")
-            appendLine("            val result = mockMvc.${httpMethod}($badUrl)")
+            appendLine("            val result = mockMvc.${httpMethod}($badUrl) {")
+            if (bodyContent.isNotEmpty()) append(bodyContent)
+            appendLine("            }")
             appendLine("                .andExpect { ")
             appendLine("                    status { isBadRequest() } ")
-            if (bodyContent.isNotEmpty()) append(bodyContent)
             appendLine("                 }")
             appendLine("                .andReturn()")
             appendLine()
@@ -283,9 +285,12 @@ object SpecTemplateUtil {
     private fun generateUrl(url: String, pathVars: List<String>, isGoodUrl: Boolean): String {
         val regex = Regex("\\{\\w+}")
         val variableNames = regex.findAll(url).map { it.groupValues[0] }.toList()
-        val variables = pathVars.map {
-            if (isGoodUrl) CodeGeneratorUtil.dummyValue(it).replace("\"", "")
-            else CodeGeneratorUtil.badDummyValue(it).replace("\"", "") }.toList()
+        val variables =
+            pathVars
+                .map {
+                    if (isGoodUrl) CodeGeneratorUtil.dummyValue(it).replace("\"", "")
+                    else CodeGeneratorUtil.badDummyValue(it).replace("\"", "")
+                }.toList()
         return variableNames.zip(variables).fold(url) { acc, (key, value) -> acc.replace(key, value) }
     }
 
