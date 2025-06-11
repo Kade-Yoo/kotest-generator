@@ -213,9 +213,6 @@ object SpecTemplateUtil {
             appendLine("                }")
             appendLine("            }")
             appendLine("        }")
-//            for ((paramName, type) in parameters) {
-//                append(buildParameterScenarioBlock(paramName, type))
-//            }
             appendLine("    }")
         }
     }
@@ -249,30 +246,6 @@ object SpecTemplateUtil {
             appendLine("    }")
         }
         appendLine("})")
-    }
-
-    private fun scenarioCasesForType(type: String): List<Pair<String, String>> = when (type) {
-        "Long", "Int" -> listOf(
-            "정상값" to CodeGeneratorUtil.dummyValue(type),
-            "음수" to CodeGeneratorUtil.badDummyValue(type),
-        )
-        "String" -> listOf(
-            "정상값" to CodeGeneratorUtil.dummyValue(type),
-            "빈값" to CodeGeneratorUtil.badDummyValue(type),
-        )
-        else -> listOf("기본값" to CodeGeneratorUtil.dummyValue(type))
-    }
-
-    private fun buildParameterScenarioBlock(paramName: String, type: String): String = buildString {
-        val cases = scenarioCasesForType(type)
-        for ((desc, value) in cases) {
-            appendLine("        $WHEN(\"$paramName: $desc\") {")
-            appendLine("            $THEN(\"적절한 응답이 반환된다\") {")
-            appendLine("                val $paramName = $value")
-            appendLine("                // TODO: 실제 메소드 호출 및 검증")
-            appendLine("            }")
-            appendLine("        }")
-        }
     }
 
     private fun findAnnotation(element: PsiElement): List<String> {

@@ -96,7 +96,7 @@ object CodeGeneratorUtil {
         parameters.toJoinedString("\n") { "        val ${it.name} = ${dummyValue(it.type)}" }
 
     fun buildBadParamDecl(parameters: List<ParameterInfo>): String =
-        parameters.toJoinedString("\n") { "           val ${it.name} = ${badDummyValue(it.type)}" }
+        parameters.toJoinedString("\n") { "            val ${it.name} = ${badDummyValue(it.type)}" }
 
     fun expectedValue(returnType: String): String =
         if (returnType == "Unit") "" else "val expected = ${dummyValue(returnType)} // TODO: 실제 값으로 변경"
