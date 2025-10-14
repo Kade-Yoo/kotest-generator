@@ -78,7 +78,7 @@ testImplementation("io.kotest:kotest-assertions-core")
 
 // IntelliJ Platform
 intellijPlatform {
-    create("IU", "2024.2.6")
+    create("IU", "2025.2.1")
     bundledPlugins("com.intellij.java")
 }
 ```

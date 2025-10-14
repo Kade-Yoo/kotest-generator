@@ -64,11 +64,4 @@ class AnnotationAnalyzer {
     ): List<ParameterInfo> =
         parameters.filter { it.springAnnotations().contains(annotation) }
 
-    /**
-     * Request 관련 어노테이션을 가진 파라미터를 필터링합니다.
-     */
-    fun filterRequestParameters(
-        parameters: List<ParameterInfo>
-    ): List<ParameterInfo> =
-        parameters.filter { it.springAnnotations().any { SpringAnnotation.isRequestAnnotation(it) } }
-} 
+}

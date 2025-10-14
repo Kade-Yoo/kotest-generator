@@ -51,10 +51,41 @@ object CodeGeneratorUtil {
                 "emptyList()"
             }
             type.startsWith("ApiResponse") -> {
-                "ApiResponse(data = null)"
+                "$type(data = null)"
             }
             else -> {
                 "mockk<$type>()"
+            }
+        }
+
+    fun dummyValueByRequestParam(type: String, name: String): String =
+        when {
+            type == "String" -> {
+                "\"expected\""
+            }
+            type == "Int" -> {
+                "1"
+            }
+            type == "Long" -> {
+                "1L"
+            }
+            type == "Boolean" -> {
+                "true"
+            }
+            type == "Double" || type == "Float" -> {
+                "1.0"
+            }
+            type.startsWith("ResponseEntity") -> {
+                "ResponseEntity.ok().build()"
+            }
+            type.startsWith("List") -> {
+                "emptyList()"
+            }
+            type.startsWith("ApiResponse") -> {
+                "$type(data = null)"
+            }
+            else -> {
+                "$$name"
             }
         }
 
@@ -82,10 +113,41 @@ object CodeGeneratorUtil {
                 "listOf()"
             }
             type.startsWith("ApiResponse") -> {
-                "ApiResponse(data = null)"
+                "$type(data = null)"
             }
             else -> {
                 "mockk<$type>()"
+            }
+        }
+
+    fun badDummyValueByRequestParam(type: String, name: String): String =
+        when {
+            type == "String" -> {
+                "\"badValue\""
+            }
+            type == "Int" -> {
+                "-1"
+            }
+            type == "Long" -> {
+                "-1L"
+            }
+            type == "Boolean" -> {
+                "false"
+            }
+            type == "Double" || type == "Float" -> {
+                "-1.0"
+            }
+            type.startsWith("ResponseEntity") -> {
+                "ResponseEntity.badRequest().build()"
+            }
+            type.startsWith("List") -> {
+                "listOf()"
+            }
+            type.startsWith("ApiResponse") -> {
+                "$type(data = null)"
+            }
+            else -> {
+                "$$name"
             }
         }
 

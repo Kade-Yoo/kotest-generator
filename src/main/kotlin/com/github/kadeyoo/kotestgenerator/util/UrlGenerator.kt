@@ -42,14 +42,13 @@ class UrlGenerator {
     fun buildParamAssignments(
         requestParams: List<ParameterInfo>,
         isGood: Boolean
-    ): String {
-        return requestParams.joinToString("&") {
+    ): String =
+        requestParams.joinToString("&") {
             val value = if (isGood) {
-                CodeGeneratorUtil.dummyValue(it.type).replace("\"", "")
+                CodeGeneratorUtil.dummyValueByRequestParam(it.type, it.name).replace("\"", "")
             } else {
-                CodeGeneratorUtil.badDummyValue(it.type).replace("\"", "")
+                CodeGeneratorUtil.badDummyValueByRequestParam(it.type, it.name).replace("\"", "")
             }
             "${it.name}=$value"
         }.let { if (it.isNotEmpty()) "?$it" else "" }
-    }
-} 
+}
