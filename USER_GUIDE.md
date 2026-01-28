@@ -1,11 +1,27 @@
 # 📘 Kotest Generator - 사용자 가이드
 
+<!-- Plugin description -->
+**Kotest Generator** is an IntelliJ IDEA plugin that analyzes Kotlin classes and methods to automatically generate Kotest-based test code. It provides test templates tailored to various component types such as Controllers and Services, reducing the time developers spend writing test code and ensuring a consistent test structure.
+
+**Key Features:**
+- Automatic test generation: Automatically generates test code for Controllers, Services, and more
+- Kotest BehaviorSpec-based: Readable test code with Given-When-Then structure
+- Time-saving: Reduces time spent writing repetitive test boilerplate
+- Consistent structure: Maintains standardized test patterns across the entire project
+
+**How to Use:**
+1. Open the Kotlin class or method you want to generate tests for
+2. Place the cursor on the class or method declaration
+3. Press the shortcut key (macOS: ⌘+⌥+G, Windows/Linux: Ctrl+Alt+G)
+4. Test files are automatically generated
+<!-- Plugin description end -->
+
 ## 🎯 소개
 
 **Kotest Generator**는 Kotlin 프로젝트에서 테스트 코드를 자동으로 생성해주는 IntelliJ IDEA 플러그인입니다.
 
 ### 주요 기능
-- ✅ **자동 테스트 생성**: Controller, Service, Repository 등의 테스트 코드를 자동으로 생성
+- ✅ **자동 테스트 생성**: Controller, Service 등의 테스트 코드를 자동으로 생성
 - ✅ **Kotest BehaviorSpec 기반**: Given-When-Then 구조의 읽기 쉬운 테스트 코드
 - ✅ **시간 절약**: 반복적인 테스트 보일러플레이트 작성 시간 단축
 - ✅ **일관된 구조**: 프로젝트 전체에 걸쳐 표준화된 테스트 패턴 유지

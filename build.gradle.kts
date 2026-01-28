@@ -69,8 +69,8 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")
 
-        // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
-        description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
+        // Extract the <!-- Plugin description --> section from USER_GUIDE.md and provide for the plugin's manifest
+        description = providers.fileContents(layout.projectDirectory.file("USER_GUIDE.md")).asText.map {
             val start = "<!-- Plugin description -->"
             val end = "<!-- Plugin description end -->"
 
