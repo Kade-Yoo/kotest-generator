@@ -64,9 +64,12 @@ class ApiTemplateGenerator : TemplateGenerator {
             appendLine()
         }
         appendLine("$DOUBLE_INDENT$WHEN(\"정상 데이터로 요청하면\") {")
-        appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}val result = $MOCK_MVC_VARIABLE.${testData.httpMethod}(${testData.goodUrl}) {")
-        if (testData.bodyContent.isNotEmpty()) append(testData.bodyContent)
-        appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}}")
+        appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}val result = $MOCK_MVC_VARIABLE.${testData.httpMethod}(${testData.goodUrl})")
+        if (testData.bodyContent.isNotEmpty()) {
+            append("{")
+            append(testData.bodyContent)
+            appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}}")
+        }
         appendLine("$DOUBLE_INDENT${DOUBLE_INDENT}.andExpect { status { $HTTP_OK } }")
         appendLine("$DOUBLE_INDENT${DOUBLE_INDENT}.andReturn()")
         appendLine()
@@ -81,9 +84,12 @@ class ApiTemplateGenerator : TemplateGenerator {
         appendLine("$DOUBLE_INDENT}")
         appendLine()
         appendLine("$DOUBLE_INDENT$WHEN(\"잘못된 요청 하면\") {")
-        appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}val result = $MOCK_MVC_VARIABLE.${testData.httpMethod}(${testData.badUrl}) {")
-        if (testData.bodyContent.isNotEmpty()) append(testData.bodyContent)
-        appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}}")
+        appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}val result = $MOCK_MVC_VARIABLE.${testData.httpMethod}(${testData.badUrl})")
+        if (testData.bodyContent.isNotEmpty()) {
+            append("{")
+            append(testData.bodyContent)
+            appendLine("$DOUBLE_INDENT${DEFAULT_INDENT}}")
+        }
         appendLine("$DOUBLE_INDENT${DOUBLE_INDENT}.andExpect { status { $HTTP_BAD_REQUEST } }")
         appendLine("$DOUBLE_INDENT${DOUBLE_INDENT}.andReturn()")
         appendLine()
